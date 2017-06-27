@@ -1,5 +1,9 @@
 <a name="TOP"></a>
 # ImgApp
+
+[![Code Climate](https://codeclimate.com/github/tanaikech/ImgApp/badges/gpa.svg)](https://codeclimate.com/github/tanaikech/ImgApp)
+[![Issue Count](https://codeclimate.com/github/tanaikech/ImgApp/badges/issue_count.svg)](https://codeclimate.com/github/tanaikech/ImgApp)
+
 This is a library of image tools for Google Apps Script.
 
 ## Methods
