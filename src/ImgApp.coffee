@@ -14,7 +14,28 @@
  * @return {Object} JSON object {identification: [png, jpg, gif and bmp], width: [pixel], height: [pixel], filesize: [bytes]}
  */
 function getSize(blob) {
-  return new ImgApp(blob).GetSize()
+  return new ImgApp().GetSize(blob)
+}
+
+/**
+ * Title  ImgApp<br>
+ * Author  Tanaike<br>
+ * GitHub  https://github.com/tanaikech/ImgApp<br>
+ *<br>
+ * Resize image from inputted width. When the source file is Google Docs (spreadsheet, document and slide),<br>
+ * its thumbnail is created and it's resized.<br>
+ * In order to use this method, please enable Drive API at Google API console.<br>
+ *<br>
+ * <h3>usage</h3>
+ * var res = ImgApp.doResize(fileId, width);<br>
+ * DriveApp.createFile(res.blob.setName("filename")); // If you want to save as a file, please use this.<br>
+ *<br>
+ * @param {string} fileId File ID on Google Drive
+ * @param {integer} width Resized width you want
+ * @return {Object} JSON object {blob: [blob], originalwidth: ###, originalheight: ###, resizedwidth: ###, resizedheight: ###}
+ */
+function doResize(fileId, width) {
+  return new ImgApp().DoResize(fileId, width)
 }
 `
 
@@ -24,15 +45,84 @@ do(r=@)->
 
 
         constructor: (blob) ->
+            @bytear = []
+
+
+        # DoResize --------------------------------------------------------------------------------
+        DoResize: (fileId, width) ->
+            try
+                res = JSON.parse(UrlFetchApp.fetch(
+                        "https://www.googleapis.com/drive/v3/files/" +
+                        fileId +
+                        "?fields=thumbnailLink%2CmimeType",
+                        method : "GET",
+                        headers:
+                            "Authorization": "Bearer " + ScriptApp.getOAuthToken(),
+                        muteHttpExceptions : true
+                        ).getContentText())
+                thumbUrl = res.thumbnailLink
+                mimetype = res.mimeType
+                r = thumbUrl.split("=")
+            catch e
+                throw new Error("'" + fileId + "' is not compatible file.")
+
+            width = if width > 0 then width else 100
+            n = false
+            rs = {}
+
+            if ~mimetype.indexOf('google-apps') or ~mimetype.indexOf('pdf')
+                n = true
+                turl = thumbUrl.replace(r[r.length - 1], "s10000")
+                rs = GetResizedSize.call @, (GetImage.call @, turl, "png"), width
+            else if ~mimetype.indexOf('image')
+                rs = GetResizedSize.call @, DriveApp.getFileById(fileId).getBlob(), width
+            else
+                turl = thumbUrl.replace(r[r.length - 1], "s10000")
+                rs = GetResizedSize.call @, (GetImage.call @, turl, "png"), width
+
+            blob = GetImage.call @, thumbUrl.replace(r[r.length - 1], "s" + if n then rs.reheight else rs.rewidth)
+            resized = @GetSize blob
+
+            blob           : blob
+            identification : resized.identification
+            originalwidth  : rs.orgwidth
+            originalheight : rs.orgheight
+            resizedwidth   : resized.width
+            resizedheight  : resized.height
+
+
+        GetImage = (turl) ->
+            UrlFetchApp.fetch(
+                    turl,
+                    headers :
+                        Authorization: "Bearer " + ScriptApp.getOAuthToken()
+            ).getBlob()
+
+
+        GetResizedSize = (blob, width) ->
+            size = @GetSize blob
+            ow = size.width
+            oh = size.height
+            if width > ow
+                rw = ow
+                rh = oh
+            else
+                rw = width
+                rh = Math.ceil(width * oh / ow)
+
+            orgwidth  : ow
+            orgheight : oh
+            rewidth   : rw
+            reheight  : rh
+
+
+        # GetSize --------------------------------------------------------------------------------
+        GetSize: (blob) ->
             @bytear = do (blob) ->
                 try
                     return blob.getBytes()
                 catch e
                     throw new Error("Cannot retrieve file blob.")
-            @format = ""
-
-
-        GetSize: () ->
             getFormat.call @
             switch @format
                 when "bmp"
