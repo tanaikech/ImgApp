@@ -3,6 +3,7 @@
 
 [![Code Climate](https://codeclimate.com/github/tanaikech/ImgApp/badges/gpa.svg)](https://codeclimate.com/github/tanaikech/ImgApp)
 [![Issue Count](https://codeclimate.com/github/tanaikech/ImgApp/badges/issue_count.svg)](https://codeclimate.com/github/tanaikech/ImgApp)
+[![MIT License](http://img.shields.io/badge/license-MIT-blue.svg?style=flat)](LICENCE)
 
 This is a library of image tools for Google Apps Script.
 
