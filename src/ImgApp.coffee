@@ -37,6 +37,28 @@ function getSize(blob) {
 function doResize(fileId, width) {
   return new ImgApp().DoResize(fileId, width)
 }
+
+/**
+ * Title  ImgApp<br>
+ * Author  Tanaike<br>
+ * GitHub  https://github.com/tanaikech/ImgApp<br>
+ *<br>
+ * Update a thumbnail of a file using an image.<br>
+ * There are some limitations for updating thumbnail.<br>
+ * Please confirm the detail information at https://developers.google.com/drive/v3/web/file#uploading_thumbnails.<br>
+ *   - If Drive can generate a thumbnail from the file, then it will use the generated one and ignore any you may have uploaded.<br>
+ *   - If it can't generate a thumbnail, it will always use yours if you provided one.<br>
+ *<br>
+ * <h3>usage</h3>
+ * ImgApp.updateThumbnail(imgFileId, srcFileId);<br>
+ *<br>
+ * @param {string} imgFileId File ID of new thumbnail image on Google Drive
+ * @param {string} srcFileId File ID of file, which is updated thumbnail, on Google Drive
+ * @return {Object} JSON object id,mimeType,name,thumbnailVersion,thumbnailLink
+ */
+function updateThumbnail(imgFileId, srcFileId) {
+  return new ImgApp().UpdateThumbnail(imgFileId, srcFileId)
+}
 `
 
 do(r=@)->
@@ -46,6 +68,35 @@ do(r=@)->
 
         constructor: (blob) ->
             @bytear = []
+
+
+        # UpdateThumbnail --------------------------------------------------------------------------------
+        UpdateThumbnail: (imgFileId_, srcFileId_) ->
+            throw new Error("No image file ID.") if !imgFileId_?
+            throw new Error("No source file ID.") if !srcFileId_?
+            img4thumb = DriveApp.getFileById(imgFileId_)
+            mime = img4thumb.getMimeType()
+            if mime isnt "image/png" and mime isnt "image/gif" and mime isnt "image/hpeg"
+                throw new Error("The image format (" + mime + ") cannot be used for thumbnail.")
+            metadata =
+                contentHints:
+                    thumbnail:
+                        image: Utilities.base64EncodeWebSafe(img4thumb.getBlob().getBytes())
+                        mimeType: mime
+            fields = "id,mimeType,name,thumbnailVersion,thumbnailLink"
+            url = "https://www.googleapis.com/upload/drive/v3/files/" + srcFileId_ + "?uploadType=multipart&fields=" + encodeURIComponent(fields)
+            boundary = "xxxxxxxxxx"
+            data = "--" + boundary + "\r\n"
+            data += "Content-Disposition: form-data; name=\"metadata\";\r\n"
+            data += "Content-Type: application/json; charset=UTF-8\r\n\r\n"
+            data += JSON.stringify(metadata) + "\r\n"
+            data += "--" + boundary + "\r\n"
+            payload = Utilities.newBlob(data).getBytes()
+            headers =
+                "Authorization" : "Bearer " + ScriptApp.getOAuthToken()
+                "Content-Type"  : "multipart/related; boundary=" + boundary
+            method  = "patch"
+            fetch.call @, url, method, payload, headers
 
 
         # DoResize --------------------------------------------------------------------------------
@@ -218,6 +269,24 @@ do(r=@)->
 
         hex2num = (data) ->
             parseInt data.join(""), 16
+
+
+        fetch = (url, method, payload, headers) ->
+            try
+                res = UrlFetchApp.fetch(
+                        url,
+                        method             : method
+                        payload            : payload
+                        headers            : headers
+                        muteHttpExceptions : true
+                        )
+            catch e
+                throw new Error(e)
+            try
+                r = JSON.parse(res.getContentText())
+            catch e
+                r = res.getContentText()
+            return r
 
 
     r.ImgApp = ImgApp

@@ -10,6 +10,7 @@ This is a library of image tools for Google Apps Script.
 ## Methods
 1. [getSize()](#getsize) : This method is for retrieving the width and height of image as the unit of pixel.
 1. [doResize()](#doresize) : This method is for resizing images. The target files are Images, Movies, Google Docs, Microsoft Docs, Text and so on. About the detail information, please check [the principle of this method](#doresize_principle).
+1. [updateThumbnail()](#updatethumbnail) : This method is for updating thumbnail of files on Google Drive.
 
 I would like to add the methods for handling images in the future.
 
@@ -88,7 +89,7 @@ Unfortunately, there are no methods to resize images at Google Apps Script. As a
 
 ![](images/demo2.gif)
 
-This is a demonstration for this method. As a sample. at first, the size of source image is retrieved using ``getSize()``. Then, the source image is resized by the inputted width. **The play speed is the real time.**
+This is a demonstration for this method. As a sample, at first, the size of source image is retrieved using ``getSize()``. Then, the source image is resized by the inputted width. **The play speed is the real time.**
 
 This sample image is created by [k3-studio](http://k3-studio.deviantart.com/art/Chromatic-lituus-415318548).
 
@@ -156,6 +157,59 @@ This method (``doResize()``) cannot resize over the original size of the source 
 1. For Google Docs, pdf, Microsoft Docs (Excel, Word and Powerpoint), Text and so on, the maximum size is **1024 pixel in the width**. The aspect ratio is maintained.
 1. The thumbnail of standalone Google Apps Script cannot be retrieved.
 
+
+-----
+<a name="updatethumbnail"></a>
+## 3. updateThumbnail()
+### Overview
+This method is for updating thumbnail of files on Google Drive using images you selected.
+
+### Description
+For example, zip files don't have the thumbnail on Google Drive. An icon is shown as the thumbnail. For the most files, Google Drive can create automatically each thumbnail. But there are sometimes files which cannot be created the thumbnail. Zip file is also one of them. In order to add and update thumbnails to such files, I added this method.
+
+### Demo
+
+![](images/demo3.gif)
+
+This is a demonstration for this method. The thumbnails of zip files are updated.
+
+This sample images are created by [k3-studio](http://k3-studio.deviantart.com).
+
+### Usage
+
+~~~javascript
+var res = ImgApp.updateThumbnail(imgFileId, srcFileId);
+~~~
+
+- ``imgFileId`` (string) : File ID of new thumbnail image on Google Drive
+- ``srcFileId`` (integer) : File ID of file, which is updated thumbnail, on Google Drive
+
+The results can be retrieved as JSON object like below.
+
+~~~
+res = {
+    "id": "### file id ###",
+    "name": "### file name ###",
+    "mimeType": "### mimeType ###",
+    "thumbnailLink": "### thumbnail link ###",
+    "thumbnailVersion": "#"
+}
+~~~
+
+This method uses multipart-POST request. If you want to know about this, please check [here](https://gist.github.com/tanaikech/d595d30a592979bbf0c692d1193d260c).
+
+<a name="updatethumbnail_limitations"></a>
+### Limitations
+You can use PNG, JPEG and GIF files as the thumbnail image. And there are some limitations for updating thumbnail. Please confirm the detail information [here](https://developers.google.com/drive/v3/web/file#uploading_thumbnails). Especially following limitations are important for using this method.
+
+- **If Drive can generate a thumbnail from the file, then it will use the generated one and ignore any you may have uploaded.**
+    - Although I used this script to Google Docs and images, the updated image was not reflected to them. It is considered that this is the limitation.
+- If it can't generate a thumbnail, it will always use yours if you provided one.
+    - ``hasThumbnail`` of zip files is false. So zip files can update the thumbnail.
+
+### Note
+In my environment, at the first update, the update had sometimes been failed. But at that time, the second update had worked fine. I don’t know about the reason. I’m sorry.
+
 -----
 
 # Appendix
@@ -188,5 +242,10 @@ e-mail: tanaike@hotmail.com
 
     Added new method.
     Added [doResize()](#doresize)
+
+* v1.2.0 (August 20, 2017)
+
+    Added new method.
+    Added [updateThumbnail()](#updatethumbnail)
 
 [TOP](#TOP)
