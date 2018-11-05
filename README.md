@@ -248,4 +248,8 @@ e-mail: tanaike@hotmail.com
     Added new method.
     Added [updateThumbnail()](#updatethumbnail)
 
+* v1.2.1 (November 5, 2018)
+
+    Efficiency of each loop was enhanced by [this benchmark](https://gist.github.com/tanaikech/848aeafaac1ec676900bb78e3ce220b6).
+
 [TOP](#TOP)

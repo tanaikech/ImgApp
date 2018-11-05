@@ -77,11 +77,11 @@ do(r=@)->
             img4thumb = DriveApp.getFileById(imgFileId_)
             mime = img4thumb.getMimeType()
             if mime isnt "image/png" and mime isnt "image/gif" and mime isnt "image/hpeg"
-                throw new Error("The image format (" + mime + ") cannot be used for thumbnail.")
+                throw new Error "The image format (" + mime + ") cannot be used for thumbnail."
             metadata =
                 contentHints:
                     thumbnail:
-                        image: Utilities.base64EncodeWebSafe(img4thumb.getBlob().getBytes())
+                        image: Utilities.base64EncodeWebSafe img4thumb.getBlob().getBytes()
                         mimeType: mime
             fields = "id,mimeType,name,thumbnailVersion,thumbnailLink"
             url = "https://www.googleapis.com/upload/drive/v3/files/" + srcFileId_ + "?uploadType=multipart&fields=" + encodeURIComponent(fields)
@@ -102,20 +102,16 @@ do(r=@)->
         # DoResize --------------------------------------------------------------------------------
         DoResize: (fileId, width) ->
             try
-                res = JSON.parse(UrlFetchApp.fetch(
-                        "https://www.googleapis.com/drive/v3/files/" +
-                        fileId +
-                        "?fields=thumbnailLink%2CmimeType",
-                        method : "GET",
-                        headers:
-                            "Authorization": "Bearer " + ScriptApp.getOAuthToken(),
-                        muteHttpExceptions : true
-                        ).getContentText())
+                url = "https://www.googleapis.com/drive/v3/files/" + fileId + "?fields=thumbnailLink%2CmimeType"
+                method = "get"
+                headers =
+                    "Authorization": "Bearer " + ScriptApp.getOAuthToken()
+                res = fetch.call @, url, method, null, headers
                 thumbUrl = res.thumbnailLink
                 mimetype = res.mimeType
-                r = thumbUrl.split("=")
+                r = thumbUrl.split "="
             catch e
-                throw new Error("'" + fileId + "' is not compatible file.")
+                throw new Error "'" + fileId + "' is not compatible file."
 
             width = if width > 0 then width else 100
             n = false
@@ -123,12 +119,12 @@ do(r=@)->
 
             if ~mimetype.indexOf('google-apps') or ~mimetype.indexOf('pdf')
                 n = true
-                turl = thumbUrl.replace(r[r.length - 1], "s10000")
+                turl = thumbUrl.replace r[r.length - 1], "s10000"
                 rs = GetResizedSize.call @, (GetImage.call @, turl, "png"), width
-            else if ~mimetype.indexOf('image')
+            else if ~mimetype.indexOf 'image'
                 rs = GetResizedSize.call @, DriveApp.getFileById(fileId).getBlob(), width
             else
-                turl = thumbUrl.replace(r[r.length - 1], "s10000")
+                turl = thumbUrl.replace r[r.length - 1], "s10000"
                 rs = GetResizedSize.call @, (GetImage.call @, turl, "png"), width
 
             blob = GetImage.call @, thumbUrl.replace(r[r.length - 1], "s" + if n then rs.reheight else rs.rewidth)
@@ -173,7 +169,7 @@ do(r=@)->
                 try
                     return blob.getBytes()
                 catch e
-                    throw new Error("Cannot retrieve file blob.")
+                    throw new Error "Cannot retrieve file blob."
             getFormat.call @
             switch @format
                 when "bmp"
@@ -186,7 +182,7 @@ do(r=@)->
                     res = getInfJPG.call @
                 else
                     res = Error: @format
-            return res
+            res
 
 
         getInfBMP = () ->
@@ -214,13 +210,13 @@ do(r=@)->
             i = 0
             while i < @bytear.length
                 i += 1
-                if (byte2hex_num.call @, @bytear[i]) is "ff"
+                if (byte2hexNum.call @, @bytear[i]) is "ff"
                     i += 1
-                    ma = byte2hex_num.call @, @bytear[i]
+                    ma = byte2hexNum.call @, @bytear[i]
                     if ma is "c0" or ma is "c1" or ma is "c2"
                         break
                     else
-                        i += hex2num.call @, (byte2hex.call @, @bytear.slice(i+1, i+3))
+                        i += hex2num.call @, (byte2hex.call @, @bytear.slice i+1, i+3)
 
             identification : "JPG"
             width          : hex2num.call @, (byte2hex.call @, @bytear.slice i+6, i+8)
@@ -238,29 +234,27 @@ do(r=@)->
             return
 
 
-        byte2hex_num = (data) ->
-            conv = `(data < 0 ? data + 256 : data).toString(16)`
-            `conv.length == 1 ? "0" + conv : conv`
+        byte2hexNum = (data) ->
+            conv = (if data < 0 then data + 256 else data).toString(16)
+            return (if conv.length is 1 then "0" + conv else conv)
 
 
         byte2hex = (data) ->
-            conv = `[(i < 0 ? i + 256 : i).toString(16) for each (i in data)]`
-            `[i.length == 1 ? "0" + i : i for each (i in conv)]`
+            data.map (e) ->
+                (if e < 0 then e + 256 else e).toString(16)
+            .map (e) ->
+                return (if e.length is 1 then "0" + e else e)
 
 
         byte2num = (data, byteorder) ->
             if byteorder
-                datlen = data.length
-                conv = new Array datlen
-                j = 0
-                `for (var i=datlen-1; i>=0; i-=1){
-                    var temp = (data[i] < 0 ? data[i] + 256 : data[i]).toString(16);
-                    if (temp.length == 1) {
-                        temp = "0" + temp;
-                    }
-                    conv[j] = temp;
-                    j += 1;
-                }`
+                conv = data.reduceRight (ar, e) ->
+                    temp = (if e < 0 then e + 256 else e).toString(16)
+                    if temp.length is 1
+                        temp = "0" + temp
+                    ar.push temp
+                    ar
+                ,[]
             else
                 conv = byte2hex.call @, data
 
@@ -281,9 +275,9 @@ do(r=@)->
                         muteHttpExceptions : true
                         )
             catch e
-                throw new Error(e)
+                throw new Error e
             try
-                r = JSON.parse(res.getContentText())
+                r = JSON.parse res.getContentText()
             catch e
                 r = res.getContentText()
             return r
