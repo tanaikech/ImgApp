@@ -252,4 +252,9 @@ e-mail: tanaike@hotmail.com
 
     Efficiency of each loop was enhanced by [this benchmark](https://gist.github.com/tanaikech/848aeafaac1ec676900bb78e3ce220b6).
 
+* v1.2.2 (April 6, 2019)
+
+    By Google's update, the error of "Malformed multipart body." occurs. This error was resolved.
+
+
 [TOP](#TOP)

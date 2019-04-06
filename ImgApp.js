@@ -95,10 +95,10 @@ function updateThumbnail(imgFileId, srcFileId) {
       url = "https://www.googleapis.com/upload/drive/v3/files/" + srcFileId_ + "?uploadType=multipart&fields=" + encodeURIComponent(fields);
       boundary = "xxxxxxxxxx";
       data = "--" + boundary + "\r\n";
-      data += "Content-Disposition: form-data; name=\"metadata\";\r\n";
+      data += "Content-Disposition: form-data; name=\"metadata\"\r\n";
       data += "Content-Type: application/json; charset=UTF-8\r\n\r\n";
       data += JSON.stringify(metadata) + "\r\n";
-      data += "--" + boundary + "\r\n";
+      data += "--" + boundary + "--\r\n";
       payload = Utilities.newBlob(data).getBytes();
       headers = {
         "Authorization": "Bearer " + ScriptApp.getOAuthToken(),
