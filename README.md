@@ -256,5 +256,9 @@ e-mail: tanaike@hotmail.com
 
     By Google's update, the error of "Malformed multipart body." occurs. This error was resolved.
 
+* v1.2.3 (January 14, 2020)
+
+    Error message was added by [https://github.com/tanaikech/ImgApp/issues/5](https://github.com/tanaikech/ImgApp/issues/5)
+
 
 [TOP](#TOP)

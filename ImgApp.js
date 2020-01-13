@@ -122,7 +122,7 @@ function updateThumbnail(imgFileId, srcFileId) {
         r = thumbUrl.split("=");
       } catch (error) {
         e = error;
-        throw new Error("'" + fileId + "' is not compatible file.");
+        throw new Error("'" + fileId + "' is not compatible file. Error message is " + JSON.stringify(e));
       }
       width = width > 0 ? width : 100;
       n = false;

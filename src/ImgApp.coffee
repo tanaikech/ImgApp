@@ -111,7 +111,7 @@ do(r=@)->
                 mimetype = res.mimeType
                 r = thumbUrl.split "="
             catch e
-                throw new Error "'" + fileId + "' is not compatible file."
+                throw new Error "'" + fileId + "' is not compatible file. Error message is " + JSON.stringify(e)
 
             width = if width > 0 then width else 100
             n = false
