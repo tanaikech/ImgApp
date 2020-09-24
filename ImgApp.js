@@ -17,12 +17,8 @@ function getSize(blob) {
 }
 
 /**
- * Title  ImgApp<br>
- * Author  Tanaike<br>
- * GitHub  https://github.com/tanaikech/ImgApp<br>
- *<br>
  * Resize image from inputted width. When the source file is Google Docs (spreadsheet, document and slide),<br>
- * its thumbnail is created and it's resized.<br>
+ * its thumbnail is created and it is resized.<br>
  * In order to use this method, please enable Drive API at Google API console.<br>
  *<br>
  * <h3>usage</h3>
@@ -38,15 +34,11 @@ function doResize(fileId, width) {
 }
 
 /**
- * Title  ImgApp<br>
- * Author  Tanaike<br>
- * GitHub  https://github.com/tanaikech/ImgApp<br>
- *<br>
  * Update a thumbnail of a file using an image.<br>
  * There are some limitations for updating thumbnail.<br>
  * Please confirm the detail information at https://developers.google.com/drive/v3/web/file#uploading_thumbnails.<br>
  *   - If Drive can generate a thumbnail from the file, then it will use the generated one and ignore any you may have uploaded.<br>
- *   - If it can't generate a thumbnail, it will always use yours if you provided one.<br>
+ *   - If it cannot generate a thumbnail, it will always use yours if you provided one.<br>
  *<br>
  * <h3>usage</h3>
  * ImgApp.updateThumbnail(imgFileId, srcFileId);<br>
@@ -58,17 +50,201 @@ function doResize(fileId, width) {
 function updateThumbnail(imgFileId, srcFileId) {
   return new ImgApp().UpdateThumbnail(imgFileId, srcFileId)
 }
+
+/**
+ * This method is for editing images. In the current stage, the image can be cropped. And several images can be merged as an image.<br>
+ * <br>
+ * <h3>usage</h3>
+ * ImgApp.editImage(object);<br>
+ * <br>
+ * @param {Object} object Object for using this method.
+ * @return {Object} Blob of result image.
+ */
+function editImage(object) {
+  return new ImgApp().EditImage(object)
+}
 ;
 (function(r) {
   var ImgApp;
   ImgApp = (function() {
-    var GetImage, GetResizedSize, byte2hex, byte2hexNum, byte2num, fetch, getFormat, getInfBMP, getInfGIF, getInfJPG, getInfPNG, hex2num;
+    var GetImage, GetResizedSize, byte2hex, byte2hexNum, byte2num, cropImage, fetch, getFormat, getImageFromSlide, getInfBMP, getInfGIF, getInfJPG, getInfPNG, hex2num, mergeImages, pixelToEmu, pixelToPt, ptToEmu, ptToPixel;
 
     ImgApp.name = "ImgApp";
 
     function ImgApp(blob) {
       this.bytear = [];
     }
+
+    ImgApp.prototype.EditImage = function(obj_) {
+      if (obj_.hasOwnProperty("blob") && obj_.hasOwnProperty("crop") && obj_.blob.toString() === "Blob" && typeof obj_.crop === "object") {
+        return cropImage.call(this, obj_);
+      } else if (obj_.hasOwnProperty("merge") && Array.isArray(obj_.merge) && Array.isArray(obj_.merge[0])) {
+        return mergeImages.call(this, obj_);
+      } else {
+        throw new Error("Wrong object. Please confirm it again.");
+      }
+    };
+
+    mergeImages = function(obj_) {
+      var canvas, croppedBlob, object, presentationId, rs, slide, slides;
+      canvas = obj_.merge.reduce((function(_this) {
+        return function(o, r) {
+          var ar, mHeight, mWidth;
+          mWidth = 0;
+          mHeight = 0;
+          ar = [];
+          r.forEach(function(c) {
+            var temp;
+            if (c && c.toString() === "Blob") {
+              temp = _this.GetSize(c);
+              if (temp.width * temp.height > 25000000) {
+                throw new Error("The image size is too large. Please check https://gist.github.com/tanaikech/9414d22de2ff30216269ca7be4bce462");
+              }
+              ar.push({
+                blob: c,
+                left: mWidth,
+                top: o.maxHeight,
+                width: temp.width,
+                height: temp.height
+              });
+              mWidth += temp.width;
+              if (mHeight < temp.height) {
+                return mHeight = temp.height;
+              }
+            } else {
+              return ar.push(null);
+            }
+          });
+          o.images.push(ar);
+          if (o.maxWidth < mWidth) {
+            o.maxWidth = mWidth;
+          }
+          o.maxHeight += mHeight;
+          return o;
+        };
+      })(this), {
+        maxWidth: 0,
+        maxHeight: 0,
+        images: []
+      });
+      object = {
+        title: "tempForImaApp",
+        width: {
+          unit: "pixel",
+          size: canvas.maxWidth
+        },
+        height: {
+          unit: "pixel",
+          size: canvas.maxHeight
+        }
+      };
+      presentationId = (new SlidesAppp("create")).createNewSlidesWithPageSize(object);
+      slides = SlidesApp.openById(presentationId);
+      slide = slides.getSlides()[0];
+      canvas.images.forEach(function(r) {
+        r.forEach(function(c) {
+          if (c) {
+            slide.insertImage(c.blob, pixelToPt.call(this, c.left), pixelToPt.call(this, c.top), pixelToPt.call(this, c.width), pixelToPt.call(this, c.height));
+          }
+        });
+      });
+      slides.saveAndClose();
+      rs = canvas.maxWidth > 1600 ? 1600 : canvas.maxWidth;
+      if (obj_.hasOwnProperty("outputWidth") && obj_.outputWidth > 0 && obj_.outputWidth <= 1600) {
+        rs = obj_.outputWidth;
+      }
+      croppedBlob = getImageFromSlide.call(this, presentationId, slide.getObjectId(), rs, obj_.outputFilename);
+      DriveApp.getFileById(presentationId).setTrashed(true);
+      return croppedBlob;
+    };
+
+    cropImage = function(obj_) {
+      var _, b, croppedBlob, height, l, object, presentationId, ref, rs, setHeight, setL, setT, setWidth, size, slide, slides, t, unit, width;
+      unit = obj_.hasOwnProperty("unit") && typeof obj_.unit === "string" ? obj_.unit : "pixel";
+      size = this.GetSize(obj_.blob);
+      if (size.width * size.height > 25000000) {
+        throw new Error("The image size is too large. Please check https://gist.github.com/tanaikech/9414d22de2ff30216269ca7be4bce462");
+      }
+      width = obj_.unit === "point" ? pixelToPt.call(this, size.width) : size.width;
+      height = obj_.unit === "point" ? pixelToPt.call(this, size.height) : size.height;
+      ref = ["t", "b", "l", "r"].map(function(k) {
+        if (obj_.crop.hasOwnProperty(k)) {
+          return Number(obj_.crop[k]);
+        } else {
+          return 0;
+        }
+      }), t = ref[0], b = ref[1], l = ref[2], r = ref[3];
+      object = {
+        title: "tempForImaApp",
+        width: {
+          unit: obj_.unit,
+          size: width - r - l
+        },
+        height: {
+          unit: obj_.unit,
+          size: height - b - t
+        }
+      };
+      presentationId = (new SlidesAppp("create")).createNewSlidesWithPageSize(object);
+      slides = SlidesApp.openById(presentationId);
+      slide = slides.getSlides()[0];
+      setWidth = obj_.unit === "pixel" ? pixelToPt.call(this, width) : width;
+      setHeight = obj_.unit === "pixel" ? pixelToPt.call(this, height) : height;
+      setL = obj_.unit === "pixel" ? pixelToPt.call(this, l) : l;
+      setT = obj_.unit === "pixel" ? pixelToPt.call(this, t) : t;
+      _ = slide.insertImage(obj_.blob, -setL, -setT, setWidth, setHeight);
+      slides.saveAndClose();
+      rs = size.width - (obj_.unit === "point" ? ptToPixel.call(this, l) : l) - (obj_.unit === "point" ? ptToPixel.call(this, r) : r);
+      if (obj_.hasOwnProperty("outputWidth") && obj_.outputWidth > 0 && obj_.outputWidth <= 1600) {
+        rs = obj_.unit === "point" ? ptToPixel.call(this, obj_.outputWidth) : obj_.outputWidth;
+      }
+      croppedBlob = getImageFromSlide.call(this, presentationId, slide.getObjectId(), rs, obj_.blob.getName());
+      DriveApp.getFileById(presentationId).setTrashed(true);
+      return croppedBlob;
+    };
+
+    ptToPixel = function(pt_) {
+      return pt_ * 1.33333;
+    };
+
+    ptToEmu = function(pt_) {
+      return pt_ * 12700;
+    };
+
+    pixelToPt = function(pixel_) {
+      return pixel_ * 0.75;
+    };
+
+    pixelToEmu = function(pixel_) {
+      return pixel_ * 0.75 * 12700;
+    };
+
+    getImageFromSlide = function(presentationId, slideId, rs, filename) {
+      var croppedBlob, e, er, resObj, url;
+      croppedBlob = null;
+      try {
+        resObj = Slides.Presentations.Pages.getThumbnail(presentationId, slideId, {
+          "thumbnailProperties.thumbnailSize": "LARGE",
+          "thumbnailProperties.mimeType": "PNG"
+        });
+        try {
+          url = resObj.contentUrl.replace(/=s\d+/, "=s" + Math.ceil(rs));
+          croppedBlob = UrlFetchApp.fetch(url).getBlob();
+        } catch (error) {
+          er = error;
+          throw new Error(er.message);
+        }
+        croppedBlob = croppedBlob.setName(filename || "outputImageFromImgApp.png");
+      } catch (error) {
+        e = error;
+        if (e.message === "Slides is not defined") {
+          throw new Error("Please enable Slides API at Advanced Google services, and try again.");
+        } else {
+          throw new Error(e.message);
+        }
+      }
+      return croppedBlob;
+    };
 
     ImgApp.prototype.UpdateThumbnail = function(imgFileId_, srcFileId_) {
       var boundary, data, fields, headers, img4thumb, metadata, method, mime, payload, url;

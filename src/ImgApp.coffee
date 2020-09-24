@@ -18,12 +18,8 @@ function getSize(blob) {
 }
 
 /**
- * Title  ImgApp<br>
- * Author  Tanaike<br>
- * GitHub  https://github.com/tanaikech/ImgApp<br>
- *<br>
  * Resize image from inputted width. When the source file is Google Docs (spreadsheet, document and slide),<br>
- * its thumbnail is created and it's resized.<br>
+ * its thumbnail is created and it is resized.<br>
  * In order to use this method, please enable Drive API at Google API console.<br>
  *<br>
  * <h3>usage</h3>
@@ -39,15 +35,11 @@ function doResize(fileId, width) {
 }
 
 /**
- * Title  ImgApp<br>
- * Author  Tanaike<br>
- * GitHub  https://github.com/tanaikech/ImgApp<br>
- *<br>
  * Update a thumbnail of a file using an image.<br>
  * There are some limitations for updating thumbnail.<br>
  * Please confirm the detail information at https://developers.google.com/drive/v3/web/file#uploading_thumbnails.<br>
  *   - If Drive can generate a thumbnail from the file, then it will use the generated one and ignore any you may have uploaded.<br>
- *   - If it can't generate a thumbnail, it will always use yours if you provided one.<br>
+ *   - If it cannot generate a thumbnail, it will always use yours if you provided one.<br>
  *<br>
  * <h3>usage</h3>
  * ImgApp.updateThumbnail(imgFileId, srcFileId);<br>
@@ -59,6 +51,19 @@ function doResize(fileId, width) {
 function updateThumbnail(imgFileId, srcFileId) {
   return new ImgApp().UpdateThumbnail(imgFileId, srcFileId)
 }
+
+/**
+ * This method is for editing images. In the current stage, the image can be cropped. And several images can be merged as an image.<br>
+ * <br>
+ * <h3>usage</h3>
+ * ImgApp.editImage(object);<br>
+ * <br>
+ * @param {Object} object Object for using this method.
+ * @return {Object} Blob of result image.
+ */
+function editImage(object) {
+  return new ImgApp().EditImage(object)
+}
 `
 
 do(r=@)->
@@ -68,6 +73,170 @@ do(r=@)->
 
         constructor: (blob) ->
             @bytear = []
+
+
+        # EditImage --------------------------------------------------------------------------------
+        EditImage: (obj_) ->
+            if obj_.hasOwnProperty("blob") and obj_.hasOwnProperty("crop") and obj_.blob.toString() is "Blob" and typeof obj_.crop is "object"
+                cropImage.call @, obj_
+
+            else if obj_.hasOwnProperty("merge") and Array.isArray(obj_.merge) and Array.isArray(obj_.merge[0])
+                mergeImages.call @, obj_
+
+            else
+                throw new Error("Wrong object. Please confirm it again.")
+
+
+        mergeImages = (obj_) ->
+            canvas = obj_.merge.reduce (o, r) =>
+                mWidth = 0
+                mHeight = 0
+                ar = []
+                r.forEach (c) =>
+                    if c and c.toString() is "Blob"
+                        temp = @GetSize c
+
+                        if temp.width * temp.height > 25000000
+                            throw new Error("The image size is too large. Please check https://gist.github.com/tanaikech/9414d22de2ff30216269ca7be4bce462")
+
+                        ar.push
+                            blob: c
+                            left: mWidth
+                            top: o.maxHeight
+                            width: temp.width
+                            height: temp.height
+
+                        mWidth += temp.width
+                        if mHeight < temp.height
+                            mHeight = temp.height
+                    else
+                        ar.push null
+                o.images.push ar
+                if o.maxWidth < mWidth
+                    o.maxWidth = mWidth
+                o.maxHeight += mHeight
+                o
+            ,
+            maxWidth: 0
+            maxHeight: 0
+            images: []
+
+            object =
+                title: "tempForImaApp"
+                width:
+                    unit: "pixel"
+                    size: canvas.maxWidth
+                height:
+                    unit: "pixel"
+                    size: canvas.maxHeight
+
+            presentationId = (new SlidesAppp("create")).createNewSlidesWithPageSize object
+            slides = SlidesApp.openById(presentationId)
+            slide = slides.getSlides()[0]
+            canvas.images.forEach (r) ->
+                r.forEach (c) ->
+                    if c
+                        slide.insertImage(
+                            c.blob
+                            pixelToPt.call(@, c.left)
+                            pixelToPt.call(@, c.top)
+                            pixelToPt.call(@, c.width)
+                            pixelToPt.call(@, c.height)
+                        )
+                    return
+                return
+
+            slides.saveAndClose()
+            rs = if canvas.maxWidth > 1600 then 1600 else canvas.maxWidth
+            if obj_.hasOwnProperty("outputWidth") and obj_.outputWidth > 0 and obj_.outputWidth <= 1600
+                rs = obj_.outputWidth
+
+            croppedBlob = getImageFromSlide.call @, presentationId, slide.getObjectId(), rs, obj_.outputFilename
+            DriveApp.getFileById(presentationId).setTrashed(true)
+            croppedBlob
+
+
+        cropImage = (obj_) ->
+            unit = if obj_.hasOwnProperty("unit") and typeof obj_.unit is "string" then obj_.unit else "pixel"
+            size = @GetSize obj_.blob
+            if size.width * size.height > 25000000
+                throw new Error("The image size is too large. Please check https://gist.github.com/tanaikech/9414d22de2ff30216269ca7be4bce462")
+
+            width = if obj_.unit is "point" then pixelToPt.call(@, size.width) else size.width
+            height = if obj_.unit is "point" then pixelToPt.call(@, size.height) else size.height
+
+            [t, b, l, r] = ["t", "b", "l", "r"].map (k) ->
+                if obj_.crop.hasOwnProperty(k) then Number(obj_.crop[k]) else 0
+
+            object =
+                title: "tempForImaApp"
+                width:
+                    unit: obj_.unit
+                    size: width - r - l
+                height:
+                    unit: obj_.unit
+                    size: height - b - t
+
+            presentationId = (new SlidesAppp("create")).createNewSlidesWithPageSize object
+            slides = SlidesApp.openById(presentationId)
+            slide = slides.getSlides()[0]
+            setWidth = if obj_.unit is "pixel" then pixelToPt.call(@, width) else width
+            setHeight = if obj_.unit is "pixel" then pixelToPt.call(@, height) else height
+            setL = if obj_.unit is "pixel" then pixelToPt.call(@, l) else l
+            setT = if obj_.unit is "pixel" then pixelToPt.call(@, t) else t
+            _ = slide.insertImage obj_.blob, -setL, -setT, setWidth, setHeight
+            slides.saveAndClose()
+
+            rs = size.width - (if obj_.unit is "point" then ptToPixel.call(@, l) else l) - (if obj_.unit is "point" then ptToPixel.call(@, r) else r)
+            if obj_.hasOwnProperty("outputWidth") and obj_.outputWidth > 0 and obj_.outputWidth <= 1600
+                rs = if obj_.unit is "point" then ptToPixel.call(@, obj_.outputWidth) else obj_.outputWidth
+
+            croppedBlob = getImageFromSlide.call @, presentationId, slide.getObjectId(), rs, obj_.blob.getName()
+            DriveApp.getFileById(presentationId).setTrashed(true)
+            croppedBlob
+
+
+        ptToPixel = (pt_) ->
+            pt_ * 1.33333
+
+
+        ptToEmu = (pt_) ->
+            pt_ * 12700
+
+
+        pixelToPt = (pixel_) ->
+            pixel_ * 0.75
+
+
+        pixelToEmu = (pixel_) ->
+            pixel_ * 0.75 * 12700
+
+
+        getImageFromSlide = (presentationId, slideId, rs, filename) ->
+            croppedBlob = null
+
+            try
+                resObj  = Slides.Presentations.Pages.getThumbnail(
+                    presentationId,
+                    slideId,
+                    "thumbnailProperties.thumbnailSize": "LARGE"
+                    "thumbnailProperties.mimeType": "PNG"
+                )
+                try
+                    url = resObj.contentUrl.replace(/=s\d+/, "=s" + Math.ceil(rs))
+                    croppedBlob = UrlFetchApp.fetch(url).getBlob()
+                catch er
+                    throw new Error er.message
+
+                croppedBlob = croppedBlob.setName(filename or "outputImageFromImgApp.png")
+
+            catch e
+                if e.message is "Slides is not defined"
+                    throw new Error "Please enable Slides API at Advanced Google services, and try again."
+                else
+                    throw new Error e.message
+
+            croppedBlob
 
 
         # UpdateThumbnail --------------------------------------------------------------------------------
