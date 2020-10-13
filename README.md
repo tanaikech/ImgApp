@@ -351,6 +351,10 @@ function getSize_doc(blob) {
 }
 ```
 
+## 2. Inserting Text on Image using Google Apps Script
+
+This is a sample script for inserting a text on an image using Google Apps Script. [https://gist.github.com/tanaikech/835642df109731a559e52d831bd3342d](https://gist.github.com/tanaikech/835642df109731a559e52d831bd3342d)
+
 ---
 
 <a name="licence"></a>
