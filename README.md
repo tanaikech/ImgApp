@@ -209,7 +209,7 @@ var res = ImgApp.updateThumbnail(imgFileId, srcFileId);
 ```
 
 - `imgFileId` (string) : File ID of new thumbnail image on Google Drive
-- `srcFileId` (integer) : File ID of file, which is updated thumbnail, on Google Drive
+- `srcFileId` (string) : File ID of file, which is updated thumbnail, on Google Drive
 
 The results can be retrieved as JSON object like below.
 
