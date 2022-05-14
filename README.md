@@ -353,7 +353,15 @@ function getSize_doc(blob) {
 
 ## 2. Inserting Text on Image using Google Apps Script
 
-This is a sample script for inserting a text on an image using Google Apps Script. [https://gist.github.com/tanaikech/835642df109731a559e52d831bd3342d](https://gist.github.com/tanaikech/835642df109731a559e52d831bd3342d)
+This is a sample script for inserting a text on an image using Google Apps Script.
+
+- [https://gist.github.com/tanaikech/835642df109731a559e52d831bd3342d](https://gist.github.com/tanaikech/835642df109731a559e52d831bd3342d)
+
+## 3. Reducing Image Data Size using Google Apps Script
+
+This is a sample script for reducing the image data size using Google Apps Script. You might have a situation where you might want to reduce the data size of image data using Google Apps Script. Here, using Google Apps Script, I would like to introduce a sample script for reducing the data size of the image data by reducing the image quality.
+
+- [https://gist.github.com/tanaikech/14c863e225162ec86894d604709d8b35](https://gist.github.com/tanaikech/14c863e225162ec86894d604709d8b35)
 
 ---
 
