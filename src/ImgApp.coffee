@@ -152,7 +152,7 @@ do(r=@)->
                 rs = obj_.outputWidth
 
             croppedBlob = getImageFromSlide.call @, presentationId, slide.getObjectId(), rs, obj_.outputFilename
-            DriveApp.getFileById(presentationId).setTrashed(true)
+            Drive.Files.remove(presentationId)
             croppedBlob
 
 
@@ -192,7 +192,7 @@ do(r=@)->
                 rs = if obj_.unit is "point" then ptToPixel.call(@, obj_.outputWidth) else obj_.outputWidth
 
             croppedBlob = getImageFromSlide.call @, presentationId, slide.getObjectId(), rs, obj_.blob.getName()
-            DriveApp.getFileById(presentationId).setTrashed(true)
+            Drive.Files.remove(presentationId)
             croppedBlob
 
 
