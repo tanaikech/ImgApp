@@ -411,4 +411,8 @@ This is a sample script for reducing the image data size using Google Apps Scrip
   Added new method.
   Added [editImage()](#editimage)
 
+- v1.3.1 (December 20, 2022)
+
+  Updated by [this pull request](https://github.com/tanaikech/ImgApp/pull/11).
+
 [TOP](#top)
