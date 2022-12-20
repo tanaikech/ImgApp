@@ -187,10 +187,15 @@ do(r=@)->
             _ = slide.insertImage obj_.blob, -setL, -setT, setWidth, setHeight
             slides.saveAndClose()
 
-            rs = size.width - (if obj_.unit is "point" then ptToPixel.call(@, l) else l) - (if obj_.unit is "point" then ptToPixel.call(@, r) else r)
+            rsWidth = size.width - (if obj_.unit is "point" then ptToPixel.call(@, l) else l) - (if obj_.unit is "point" then ptToPixel.call(@, r) else r)
+            rsHeight = size.height - (if obj_.unit is "point" then ptToPixel.call(@, t) else t) - (if obj_.unit is "point" then ptToPixel.call(@, b) else b)
             if obj_.hasOwnProperty("outputWidth") and obj_.outputWidth > 0 and obj_.outputWidth <= 1600
-                rs = if obj_.unit is "point" then ptToPixel.call(@, obj_.outputWidth) else obj_.outputWidth
+                rsWidth = if obj_.unit is "point" then ptToPixel.call(@, obj_.outputWidth) else obj_.outputWidth
 
+            if obj_.hasOwnProperty("outputHeight") and obj_.outputHeight > 0 and obj_.outputHeight <= 1600
+                rsHeight = if obj_.unit is "point" then ptToPixel.call(@, obj_.outputHeight) else obj_.outputHeight
+
+            rs = Math.max(rsWidth, rsHeight)
             croppedBlob = getImageFromSlide.call @, presentationId, slide.getObjectId(), rs, obj_.blob.getName()
             DriveApp.getFileById(presentationId).setTrashed(true)
             croppedBlob
