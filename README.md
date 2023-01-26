@@ -415,4 +415,8 @@ This is a sample script for reducing the image data size using Google Apps Scrip
 
   Updated by [this pull request](https://github.com/tanaikech/ImgApp/pull/11).
 
+- v1.3.2 (January 27, 2023)
+
+  Updated by [this report](https://github.com/tanaikech/ImgApp/issues/13). From this version, the shared Drive can be used.
+
 [TOP](#top)
