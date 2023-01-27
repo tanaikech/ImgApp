@@ -14,7 +14,7 @@
  * @return {Object} JSON object {identification: [png, jpg, gif and bmp], width: [pixel], height: [pixel], filesize: [bytes]}
  */
 function getSize(blob) {
-  return new ImgApp().GetSize(blob)
+  return new ImgApp().GetSize(blob);
 }
 
 /**
@@ -31,7 +31,7 @@ function getSize(blob) {
  * @return {Object} JSON object {blob: [blob], originalwidth: ###, originalheight: ###, resizedwidth: ###, resizedheight: ###}
  */
 function doResize(fileId, width) {
-  return new ImgApp().DoResize(fileId, width)
+  return new ImgApp().DoResize(fileId, width);
 }
 
 /**
@@ -49,7 +49,7 @@ function doResize(fileId, width) {
  * @return {Object} JSON object id,mimeType,name,thumbnailVersion,thumbnailLink
  */
 function updateThumbnail(imgFileId, srcFileId) {
-  return new ImgApp().UpdateThumbnail(imgFileId, srcFileId)
+  return new ImgApp().UpdateThumbnail(imgFileId, srcFileId);
 }
 
 /**
@@ -62,7 +62,7 @@ function updateThumbnail(imgFileId, srcFileId) {
  * @return {Object} Blob of result image.
  */
 function editImage(object) {
-  return new ImgApp().EditImage(object)
+  return new ImgApp().EditImage(object);
 }
 `
 
@@ -187,15 +187,10 @@ do(r=@)->
             _ = slide.insertImage obj_.blob, -setL, -setT, setWidth, setHeight
             slides.saveAndClose()
 
-            rsWidth = size.width - (if obj_.unit is "point" then ptToPixel.call(@, l) else l) - (if obj_.unit is "point" then ptToPixel.call(@, r) else r)
-            rsHeight = size.height - (if obj_.unit is "point" then ptToPixel.call(@, t) else t) - (if obj_.unit is "point" then ptToPixel.call(@, b) else b)
+            rs = size.width - (if obj_.unit is "point" then ptToPixel.call(@, l) else l) - (if obj_.unit is "point" then ptToPixel.call(@, r) else r)
             if obj_.hasOwnProperty("outputWidth") and obj_.outputWidth > 0 and obj_.outputWidth <= 1600
-                rsWidth = if obj_.unit is "point" then ptToPixel.call(@, obj_.outputWidth) else obj_.outputWidth
+                rs = if obj_.unit is "point" then ptToPixel.call(@, obj_.outputWidth) else obj_.outputWidth
 
-            if obj_.hasOwnProperty("outputHeight") and obj_.outputHeight > 0 and obj_.outputHeight <= 1600
-                rsHeight = if obj_.unit is "point" then ptToPixel.call(@, obj_.outputHeight) else obj_.outputHeight
-
-            rs = Math.max(rsWidth, rsHeight)
             croppedBlob = getImageFromSlide.call @, presentationId, slide.getObjectId(), rs, obj_.blob.getName()
             DriveApp.getFileById(presentationId).setTrashed(true)
             croppedBlob
@@ -250,7 +245,7 @@ do(r=@)->
             throw new Error("No source file ID.") if !srcFileId_?
             img4thumb = DriveApp.getFileById(imgFileId_)
             mime = img4thumb.getMimeType()
-            if mime isnt "image/png" and mime isnt "image/gif" and mime isnt "image/hpeg"
+            if mime isnt "image/png" and mime isnt "image/gif" and mime isnt "image/jpeg"
                 throw new Error "The image format (" + mime + ") cannot be used for thumbnail."
             metadata =
                 contentHints:
@@ -258,7 +253,7 @@ do(r=@)->
                         image: Utilities.base64EncodeWebSafe img4thumb.getBlob().getBytes()
                         mimeType: mime
             fields = "id,mimeType,name,thumbnailVersion,thumbnailLink"
-            url = "https://www.googleapis.com/upload/drive/v3/files/" + srcFileId_ + "?uploadType=multipart&fields=" + encodeURIComponent(fields)
+            url = "https://www.googleapis.com/upload/drive/v3/files/" + srcFileId_ + "?uploadType=multipart&supportsAllDrives=true&fields=" + encodeURIComponent(fields)
             boundary = "xxxxxxxxxx"
             data = "--" + boundary + "\r\n"
             data += "Content-Disposition: form-data; name=\"metadata\"\r\n"
@@ -276,7 +271,7 @@ do(r=@)->
         # DoResize --------------------------------------------------------------------------------
         DoResize: (fileId, width) ->
             try
-                url = "https://www.googleapis.com/drive/v3/files/" + fileId + "?fields=thumbnailLink%2CmimeType"
+                url = "https://www.googleapis.com/drive/v3/files/" + fileId + "?supportsAllDrives=true&fields=thumbnailLink%2CmimeType"
                 method = "get"
                 headers =
                     "Authorization": "Bearer " + ScriptApp.getOAuthToken()
