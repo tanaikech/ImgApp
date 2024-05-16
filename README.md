@@ -419,4 +419,8 @@ This is a sample script for reducing the image data size using Google Apps Scrip
 
   Updated by [this report](https://github.com/tanaikech/ImgApp/issues/13). From this version, the shared Drive can be used.
 
+- v1.3.3 (May 16, 2024)
+
+  In SlidesAppp.gs, added a script for checking whether Drive API and Slides API are enabled. [Ref](https://medium.com/@tanaike/checking-api-enabled-with-advanced-google-services-using-google-apps-script-572bcdeb39a8)
+
 [TOP](#top)
