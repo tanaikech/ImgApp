@@ -8,11 +8,11 @@ class ImgApp {
   constructor() {}
 
   /**
-   * Retrieves the image size (width and height) from a file blob.
+   * Retrieves the image size (width and height) and DPI/PPI from a file blob.
    * Optimized using DataView for high-speed binary parsing on V8 runtime.
    *
-   * @param {Object} blob File blob (PNG, JPG, GIF, BMP)
-   * @return {Object} JSON object {identification: string, width: number, height: number, filesize: number}
+   * @param {Object} blob File blob (PNG, JPG, GIF, BMP, TIFF)
+   * @return {Object} JSON object {identification: string, width: number, height: number, filesize: number, dpi: number|null}
    */
   GetSize(blob) {
     let bytes;
@@ -29,6 +29,7 @@ class ImgApp {
       buffer[i] = bytes[i];
     }
     const view = new DataView(buffer.buffer);
+    let dpi = null;
 
     // PNG signature: 89 50 4E 47 0D 0A 1A 0A
     if (
@@ -36,33 +37,198 @@ class ImgApp {
       view.getUint32(0, false) === 0x89504e47 &&
       view.getUint32(4, false) === 0x0d0a1a0a
     ) {
+      const width = view.getUint32(16, false);
+      const height = view.getUint32(20, false);
+      
+      // Parse chunks for pHYs
+      let offset = 8;
+      while (offset + 12 < filesize) {
+        const chunkLength = view.getUint32(offset, false);
+        const chunkType = view.getUint32(offset + 4, false);
+        if (chunkType === 0x70485973) { // "pHYs"
+          const pxPerUnitX = view.getUint32(offset + 8, false);
+          const unit = view.getUint8(offset + 16);
+          if (unit === 1) { // meter
+            dpi = Math.round(pxPerUnitX * 0.0254);
+          }
+          break;
+        }
+        offset += 12 + chunkLength;
+      }
+
       return {
         identification: "PNG",
-        width: view.getUint32(16, false),
-        height: view.getUint32(20, false),
+        width,
+        height,
         filesize,
+        dpi,
       };
     }
 
     // JPG signature: FF D8
     if (filesize > 2 && view.getUint16(0, false) === 0xffd8) {
       let offset = 2;
-      while (offset < view.byteLength) {
-        let marker = view.getUint8(offset);
+      let width = null;
+      let height = null;
+      let jfifDpi = null;
+      let exifDpi = null;
+
+      while (offset + 4 < filesize) {
+        const marker = view.getUint8(offset);
         if (marker === 0xff) {
-          let type = view.getUint8(offset + 1);
+          const type = view.getUint8(offset + 1);
+          const length = view.getUint16(offset + 2, false);
+
           if (type === 0xc0 || type === 0xc1 || type === 0xc2) {
-            return {
-              identification: "JPG",
-              width: view.getUint16(offset + 7, false),
-              height: view.getUint16(offset + 5, false),
-              filesize,
-            };
-          } else {
-            offset += 2 + view.getUint16(offset + 2, false);
+            // SOF0, SOF1, SOF2
+            height = view.getUint16(offset + 5, false);
+            width = view.getUint16(offset + 7, false);
+          } else if (type === 0xe0) {
+            // APP0 (JFIF)
+            if (
+              offset + 14 < filesize &&
+              view.getUint32(offset + 4, false) === 0x4a464946 && // "JFIF"
+              view.getUint8(offset + 8) === 0x00
+            ) {
+              const densityUnits = view.getUint8(offset + 9);
+              const xDensity = view.getUint16(offset + 10, false);
+              if (densityUnits === 1) {
+                jfifDpi = xDensity;
+              } else if (densityUnits === 2) {
+                jfifDpi = Math.round(xDensity * 2.54);
+              }
+            }
+          } else if (type === 0xe1) {
+            // APP1 (EXIF)
+            if (
+              offset + 16 < filesize &&
+              view.getUint32(offset + 4, false) === 0x45786966 && // "Exif"
+              view.getUint16(offset + 8, false) === 0x0000
+            ) {
+              const tiffHeaderOffset = offset + 10;
+              if (tiffHeaderOffset + 8 <= filesize) {
+                const byteOrder = view.getUint16(tiffHeaderOffset, false);
+                const littleEndian = byteOrder === 0x4949; // "II"
+                
+                if (
+                  (byteOrder === 0x4949 || byteOrder === 0x4d4d) &&
+                  view.getUint16(tiffHeaderOffset + 2, littleEndian) === 42
+                ) {
+                  const ifdOffset = tiffHeaderOffset + view.getUint32(tiffHeaderOffset + 4, littleEndian);
+                  if (ifdOffset + 2 < filesize) {
+                    const numEntries = view.getUint16(ifdOffset, littleEndian);
+                    let resUnit = 2; // Default to inches
+                    let xResNumerator = null;
+                    let xResDenominator = null;
+
+                    for (let i = 0; i < numEntries; i++) {
+                      const entryOffset = ifdOffset + 2 + i * 12;
+                      if (entryOffset + 12 > filesize) break;
+
+                      const tag = view.getUint16(entryOffset, littleEndian);
+                      if (tag === 296) { // ResolutionUnit
+                        resUnit = view.getUint16(entryOffset + 8, littleEndian);
+                      } else if (tag === 282) { // XResolution
+                        const valOffset = view.getUint32(entryOffset + 8, littleEndian);
+                        const ratOffset = tiffHeaderOffset + valOffset;
+                        if (ratOffset + 8 <= filesize) {
+                          xResNumerator = view.getUint32(ratOffset, littleEndian);
+                          xResDenominator = view.getUint32(ratOffset + 4, littleEndian);
+                        }
+                      }
+                    }
+
+                    if (xResNumerator !== null && xResDenominator > 0) {
+                      const baseRes = xResNumerator / xResDenominator;
+                      if (resUnit === 3) { // cm
+                        exifDpi = Math.round(baseRes * 2.54);
+                      } else {
+                        exifDpi = Math.round(baseRes);
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
+          
+          if (width !== null && height !== null && (jfifDpi !== null || exifDpi !== null || offset + length >= filesize)) {
+            break;
+          }
+          offset += 2 + length;
         } else {
           offset++;
+        }
+      }
+
+      if (width !== null && height !== null) {
+        return {
+          identification: "JPG",
+          width,
+          height,
+          filesize,
+          dpi: jfifDpi !== null ? jfifDpi : exifDpi,
+        };
+      }
+    }
+
+    // TIFF signature: 49 49 ("II" - Little Endian) or 4D 4D ("MM" - Big Endian)
+    if (
+      filesize > 8 &&
+      (view.getUint16(0, false) === 0x4949 || view.getUint16(0, false) === 0x4d4d)
+    ) {
+      const littleEndian = view.getUint16(0, false) === 0x4949;
+      if (view.getUint16(2, littleEndian) === 42) {
+        const ifdOffset = view.getUint32(4, littleEndian);
+        if (ifdOffset + 2 < filesize) {
+          const numEntries = view.getUint16(ifdOffset, littleEndian);
+          let width = null;
+          let height = null;
+          let resUnit = 2; // Default to inches
+          let xResNumerator = null;
+          let xResDenominator = null;
+
+          for (let i = 0; i < numEntries; i++) {
+            const entryOffset = ifdOffset + 2 + i * 12;
+            if (entryOffset + 12 > filesize) break;
+
+            const tag = view.getUint16(entryOffset, littleEndian);
+            const type = view.getUint16(entryOffset + 2, littleEndian);
+
+            if (tag === 256) { // ImageWidth
+              width = type === 3 ? view.getUint16(entryOffset + 8, littleEndian) : view.getUint32(entryOffset + 8, littleEndian);
+            } else if (tag === 257) { // ImageHeight
+              height = type === 3 ? view.getUint16(entryOffset + 8, littleEndian) : view.getUint32(entryOffset + 8, littleEndian);
+            } else if (tag === 296) { // ResolutionUnit
+              resUnit = view.getUint16(entryOffset + 8, littleEndian);
+            } else if (tag === 282) { // XResolution
+              const valOffset = view.getUint32(entryOffset + 8, littleEndian);
+              if (valOffset + 8 <= filesize) {
+                xResNumerator = view.getUint32(valOffset, littleEndian);
+                xResDenominator = view.getUint32(valOffset + 4, littleEndian);
+              }
+            }
+          }
+
+          if (width !== null && height !== null) {
+            let tiffDpi = null;
+            if (xResNumerator !== null && xResDenominator > 0) {
+              const baseRes = xResNumerator / xResDenominator;
+              if (resUnit === 3) { // cm
+                tiffDpi = Math.round(baseRes * 2.54);
+              } else {
+                tiffDpi = Math.round(baseRes);
+              }
+            }
+
+            return {
+              identification: "TIFF",
+              width,
+              height,
+              filesize,
+              dpi: tiffDpi,
+            };
+          }
         }
       }
     }
@@ -79,6 +245,7 @@ class ImgApp {
         width: view.getUint16(6, true),
         height: view.getUint16(8, true),
         filesize,
+        dpi: null,
       };
     }
 
@@ -89,84 +256,110 @@ class ImgApp {
         width: view.getInt32(18, true),
         height: Math.abs(view.getInt32(22, true)), // BMP height can be negative (top-down DIB)
         filesize,
+        dpi: null,
       };
     }
 
     return {
       Error:
-        "Cannot retrieve image size. Supported formats: PNG, JPG, GIF, BMP.",
+        "Cannot retrieve image size. Supported formats: PNG, JPG, GIF, BMP, TIFF.",
     };
   }
 
   /**
    * Resizes an image based on the inputted width.
-   * Uses Drive API thumbnailLink property.
+   * Uses Drive API thumbnailLink property. Supports fileId, Blob input, and mimeType conversion.
    *
-   * @param {string} fileId File ID on Google Drive
+   * @param {string|Object} fileIdOrBlob File ID on Google Drive or image Blob
    * @param {number} width Resized width you want
+   * @param {string} [mimeType] Optional target mimeType to convert to (e.g. "image/png")
    * @return {Object} JSON object {blob, originalwidth, originalheight, resizedwidth, resizedheight, identification}
    */
-  DoResize(fileId, width) {
-    const url = `https://www.googleapis.com/drive/v3/files/${fileId}?supportsAllDrives=true&fields=thumbnailLink,mimeType`;
-    const options = {
-      method: "get",
-      headers: { Authorization: `Bearer ${ScriptApp.getOAuthToken()}` },
-      muteHttpExceptions: true,
-    };
+  DoResize(fileIdOrBlob, width, mimeType = null) {
+    const isBlob = fileIdOrBlob && typeof fileIdOrBlob === "object" && (fileIdOrBlob.toString() === "Blob" || typeof fileIdOrBlob.getBytes === "function");
+    let tempFile = null;
+    let fileId = fileIdOrBlob;
 
-    const res = UrlFetchApp.fetch(url, options);
-    if (res.getResponseCode() >= 400) {
-      throw new Error(
-        `'${fileId}' is not compatible. Error message: ${res.getContentText()}`,
-      );
+    if (isBlob) {
+      tempFile = DriveApp.createFile(fileIdOrBlob);
+      fileId = tempFile.getId();
     }
 
-    const data = JSON.parse(res.getContentText());
-    if (!data.thumbnailLink)
-      throw new Error("Cannot retrieve thumbnail link from this file.");
+    try {
+      const url = `https://www.googleapis.com/drive/v3/files/${fileId}?supportsAllDrives=true&fields=thumbnailLink,mimeType`;
+      const options = {
+        method: "get",
+        headers: { Authorization: `Bearer ${ScriptApp.getOAuthToken()}` },
+        muteHttpExceptions: true,
+      };
 
-    const parts = data.thumbnailLink.split("=");
-    const baseThumbUrl = parts.slice(0, parts.length - 1).join("=");
-    const mimetype = data.mimeType;
-    const targetWidth = width > 0 ? width : 100;
+      const res = UrlFetchApp.fetch(url, options);
+      if (res.getResponseCode() >= 400) {
+        throw new Error(
+          `'${fileId}' is not compatible. Error message: ${res.getContentText()}`,
+        );
+      }
 
-    let isDocOrPdf =
-      mimetype.includes("google-apps") || mimetype.includes("pdf");
-    let originalBlob;
+      const data = JSON.parse(res.getContentText());
+      if (!data.thumbnailLink)
+        throw new Error("Cannot retrieve thumbnail link from this file.");
 
-    if (isDocOrPdf) {
-      originalBlob = this._fetchImageBlob(`${baseThumbUrl}=s10000`);
-    } else if (mimetype.includes("image")) {
-      originalBlob = DriveApp.getFileById(fileId).getBlob();
-    } else {
-      originalBlob = this._fetchImageBlob(`${baseThumbUrl}=s10000`);
+      const parts = data.thumbnailLink.split("=");
+      const baseThumbUrl = parts.slice(0, parts.length - 1).join("=");
+      const originalMimetype = data.mimeType;
+      const targetWidth = width > 0 ? width : 100;
+
+      let isDocOrPdf =
+        originalMimetype.includes("google-apps") || originalMimetype.includes("pdf");
+      let originalBlob;
+
+      if (isDocOrPdf) {
+        originalBlob = this._fetchImageBlob(`${baseThumbUrl}=s10000`);
+      } else if (originalMimetype.includes("image")) {
+        originalBlob = DriveApp.getFileById(fileId).getBlob();
+      } else {
+        originalBlob = this._fetchImageBlob(`${baseThumbUrl}=s10000`);
+      }
+
+      const sizeInfo = this.GetSize(originalBlob);
+      const ow = sizeInfo.width;
+      const oh = sizeInfo.height;
+
+      let rw, rh;
+      if (targetWidth > ow) {
+        rw = ow;
+        rh = oh;
+      } else {
+        rw = targetWidth;
+        rh = Math.ceil((targetWidth * oh) / ow);
+      }
+
+      const fetchParam = isDocOrPdf ? `s${rh}` : `s${rw}`;
+      let resizedBlob = this._fetchImageBlob(`${baseThumbUrl}=${fetchParam}`);
+
+      if (mimeType) {
+        resizedBlob = resizedBlob.getAs(mimeType);
+      }
+
+      const resizedSizeInfo = this.GetSize(resizedBlob);
+
+      return {
+        blob: resizedBlob,
+        identification: resizedSizeInfo.identification || sizeInfo.identification,
+        originalwidth: ow,
+        originalheight: oh,
+        resizedwidth: resizedSizeInfo.width || rw,
+        resizedheight: resizedSizeInfo.height || rh,
+      };
+    } finally {
+      if (tempFile) {
+        try {
+          tempFile.setTrashed(true);
+        } catch (e) {
+          // Ignore cleanup errors
+        }
+      }
     }
-
-    const sizeInfo = this.GetSize(originalBlob);
-    const ow = sizeInfo.width;
-    const oh = sizeInfo.height;
-
-    let rw, rh;
-    if (targetWidth > ow) {
-      rw = ow;
-      rh = oh;
-    } else {
-      rw = targetWidth;
-      rh = Math.ceil((targetWidth * oh) / ow);
-    }
-
-    const fetchParam = isDocOrPdf ? `s${rh}` : `s${rw}`;
-    const resizedBlob = this._fetchImageBlob(`${baseThumbUrl}=${fetchParam}`);
-    const resizedSizeInfo = this.GetSize(resizedBlob);
-
-    return {
-      blob: resizedBlob,
-      identification: resizedSizeInfo.identification || sizeInfo.identification,
-      originalwidth: ow,
-      originalheight: oh,
-      resizedwidth: resizedSizeInfo.width || rw,
-      resizedheight: resizedSizeInfo.height || rh,
-    };
   }
 
   /**
@@ -478,22 +671,23 @@ class ImgApp {
 /* ================= Global API Exposing Functions ================= */
 
 /**
- * Retrieve image size (width and height) from file blob.
- * @param {Object} blob File blob: png, jpg, gif and bmp
- * @return {Object} JSON object {identification: [png, jpg, gif and bmp], width: [pixel], height: [pixel], filesize: [bytes]}
+ * Retrieve image size (width and height) and DPI from file blob.
+ * @param {Object} blob File blob: png, jpg, gif, bmp, and tiff
+ * @return {Object} JSON object {identification: [png, jpg, gif, bmp, tiff], width: [pixel], height: [pixel], filesize: [bytes], dpi: [number|null]}
  */
 function getSize(blob) {
   return new ImgApp().GetSize(blob);
 }
 
 /**
- * Resize image from inputted width.
- * @param {string} fileId File ID on Google Drive
+ * Resize image from inputted width. Supports fileId, Blob input, and mimeType conversion.
+ * @param {string|Object} fileIdOrBlob File ID on Google Drive or image Blob
  * @param {integer} width Resized width you want
- * @return {Object} JSON object {blob: [blob], originalwidth: ###, originalheight: ###, resizedwidth: ###, resizedheight: ###}
+ * @param {string} [mimeType] Optional target mimeType to convert to
+ * @return {Object} JSON object {blob: [blob], originalwidth: ###, originalheight: ###, resizedwidth: ###, resizedheight: ###, identification: ###}
  */
-function doResize(fileId, width) {
-  return new ImgApp().DoResize(fileId, width);
+function doResize(fileIdOrBlob, width, mimeType) {
+  return new ImgApp().DoResize(fileIdOrBlob, width, mimeType);
 }
 
 /**

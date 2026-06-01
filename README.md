@@ -23,9 +23,10 @@ This is a library of image tools for Google Apps Script.
 ## How to install
 
 - Open Script Editor. And please operate follows by click.
-- -> Resource
-- -> Library
-- -> Input Script ID to text box. Script ID is **`1T03nYHRho6XMWYcaumClcWr6ble65mAT8OLJqRFJ5lukPVogAN2NDl-y`**.
+- -> Resource / Services
+- -> Add Library
+- -> Input Script ID to text box. Public Library Script ID is **`1T03nYHRho6XMWYcaumClcWr6ble65mAT8OLJqRFJ5lukPVogAN2NDl-y`**.
+  *(Note: If you have deployed your own customized build of ImgApp, use the Script ID of your deployed deployment after sharing it as "Anyone with link can view").*
 - -> Add library
 - -> Please select latest version
 - -> Developer mode ON (If you don't want to use latest version, please select others.)
@@ -70,25 +71,27 @@ At first, please retrieve the file blob of image and give it to `ImgApp.getSize(
 
 ```
 res = {
-        identification : ### BMP, GIF, PNG and JPG ###,
+        identification : ### BMP, GIF, PNG, JPG, and TIFF ###,
         width          : ### pixel ###,
         height         : ### pixel ###,
-        filesize       : ### bytes ###
+        filesize       : ### bytes ###,
+        dpi            : ### resolution in DPI (number or null) ###
 }
 ```
 
-So if you want width and height, you can retrieve them using as follows.
+So if you want width, height, and DPI, you can retrieve them using as follows.
 
 ```javascript
 var blob = DriveApp.getFileById(fileId).getBlob();
 var res = ImgApp.getSize(blob);
 var width = res.width;
 var height = res.height;
+var dpi = res.dpi;
 ```
 
 ### Limitation
 
-This method (`getSize()`) can retrieve the size information from BMP, GIF, PNG and JPG files.
+This method (`getSize()`) can retrieve the size and DPI information from BMP, GIF, PNG, JPG, and TIFF files. Note that Google Apps Script restricts standard in-memory blobs to 50MB.
 
 ---
 
@@ -115,20 +118,26 @@ This sample image is created by [k3-studio](http://k3-studio.deviantart.com/art/
 ### Usage
 
 ```javascript
+// Resize using a file ID
 var res = ImgApp.doResize(fileId, width);
+
+// Resize using a Blob directly (automatically handles temporary Drive upload/cleanup)
+var resBlob = ImgApp.doResize(blob, width);
+
+// Resize and convert the target format to PNG
+var resPng = ImgApp.doResize(fileId, width, "image/png");
 ```
 
-- `fileId` (string) : File ID
-- `width` (integer) : Resized width
-
-About file ID, if you want to convert spreadsheet to an image, you can achieve it by inputting file ID of the spreadsheet. But there are some limitations. So please check [the limitations](#doresizelimitations).
+- `fileIdOrBlob` (string|Blob) : File ID on Google Drive or image Blob.
+- `width` (integer) : Resized width.
+- `mimeType` (string) : *[Optional]* The target mimeType to convert the output image to (e.g. `"image/png"`, `"image/jpeg"`).
 
 The results can be retrieved as JSON object like below.
 
 ```
 res = {
         blob           : blob,
-        identification : ### BMP, GIF, PNG and JPG ###,
+        identification : ### BMP, GIF, PNG, JPG, or TIFF ###,
         originalwidth  : ### pixel ###,
         originalheight : ### pixel ###,
         resizedwidth   : ### pixel ###,
