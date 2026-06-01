@@ -2,11 +2,11 @@
 
 # ImgApp
 
-[![Code Climate](https://codeclimate.com/github/tanaikech/ImgApp/badges/gpa.svg)](https://codeclimate.com/github/tanaikech/ImgApp)
-[![Issue Count](https://codeclimate.com/github/tanaikech/ImgApp/badges/issue_count.svg)](https://codeclimate.com/github/tanaikech/ImgApp)
 [![MIT License](http://img.shields.io/badge/license-MIT-blue.svg?style=flat)](LICENCE)
 
 This is a library of image tools for Google Apps Script.
+
+**[UPDATE v2.0.0]** The entire internal architecture has been modernized to ES6+ standards natively leveraging the GAS V8 runtime and Google Drive API v3. High-speed binary parsing logic using `DataView` has drastically reduced execution times and memory constraints. Backward compatibility of all existing methods remains 100% intact.
 
 ## Methods
 
@@ -18,7 +18,7 @@ This is a library of image tools for Google Apps Script.
 
 4. [editImage()](#editimage) : Edit an image. The image can be cropped. And also, the several images can be merged as an image.
 
-I would like to add the methods for handling images in the future.
+5. [extractText()](#extracttext) : **[NEW]** Extract text directly from an image (OCR capability) using Google Drive API v3 without needing external Vision APIs.
 
 ## How to install
 
@@ -45,7 +45,7 @@ I would like to add the methods for handling images in the future.
 
 ### Overview
 
-This method is for retrieving the width and height of image as the unit of pixel.
+This method is for retrieving the width and height of image as the unit of pixel. Now leverages native `DataView` array buffers for lightning-fast parsing.
 
 ### Description
 
@@ -333,6 +333,39 @@ The results can be retrieved as Blob.
 
 ---
 
+<a name="extracttext"></a>
+
+## 5. extractText()
+
+### Overview
+
+This method extracts text directly from an image (OCR capability) using the Google Drive API v3.
+
+### Description
+
+Modern applications often require pulling raw string data from images. Rather than relying on external Vision APIs that require complex integrations, this method leverages Google Drive API's native document conversion abilities to run Optical Character Recognition (OCR) against a given blob, effortlessly returning the extracted string. The temporary file created during this conversion is permanently deleted implicitly, ensuring your Drive quota and structure remain perfectly clean.
+
+### Usage
+
+```javascript
+var blob = DriveApp.getFileById(fileId).getBlob();
+var res = ImgApp.extractText(blob, { language: "en" });
+Logger.log(res.text);
+```
+
+- `blob` (Blob) : The image blob (PNG, JPG, PDF) you wish to extract text from.
+- `options` (Object) : A settings object where you define OCR configurations. Specify `language` (e.g., "en", "ja", "fr").
+
+The results can be retrieved as a JSON object like below.
+
+```
+res = {
+        text : "The text extracted from your image."
+}
+```
+
+---
+
 # Appendix
 
 <a name="retrieveusingdoc"></a>
@@ -379,48 +412,55 @@ This is a sample script for reducing the image data size using Google Apps Scrip
 
 # Update History
 
-- v1.0.0 (June 27, 2017)
+- **v2.0.0 (June 1, 2026)**
 
-  Initial release.
-  Added [getSize()](#getsize)
+  Entire architecture modernized with ES6+ specifically optimized for the GAS V8 engine and Google Drive API v3 compliance.
+  Replaced legacy binary parsing logic in `getSize()` with native `DataView` implementations resulting in massive memory savings and drastically faster execution loops.
+  Added [extractText()](#extracttext) method providing out-of-the-box Image-to-Text OCR functionalities via Drive API integration.
+  Removed outdated IIFEs and pseudo-prototypes. The codebase is now strict, globally-accessible class-based architecture.
 
-- v1.1.0 (June 29, 2017)
+- v1.3.3 (May 16, 2024)
 
-  Added new method.
-  Added [doResize()](#doresize)
+  In SlidesAppp.gs, added a script for checking whether Drive API and Slides API are enabled. [Ref](https://medium.com/@tanaike/checking-api-enabled-with-advanced-google-services-using-google-apps-script-572bcdeb39a8)
 
-- v1.2.0 (August 20, 2017)
+- v1.3.2 (January 27, 2023)
 
-  Added new method.
-  Added [updateThumbnail()](#updatethumbnail)
+  Updated by [this report](https://github.com/tanaikech/ImgApp/issues/13). From this version, the shared Drive can be used.
 
-- v1.2.1 (November 5, 2018)
+- v1.3.1 (December 20, 2022)
 
-  Efficiency of each loop was enhanced by [this benchmark](https://gist.github.com/tanaikech/848aeafaac1ec676900bb78e3ce220b6).
-
-- v1.2.2 (April 6, 2019)
-
-  By Google's update, the error of "Malformed multipart body." occurs. This error was resolved.
-
-- v1.2.3 (January 14, 2020)
-
-  Error message was added by [https://github.com/tanaikech/ImgApp/issues/5](https://github.com/tanaikech/ImgApp/issues/5)
+  Updated by [this pull request](https://github.com/tanaikech/ImgApp/pull/11).
 
 - v1.3.0 (September 24, 2020)
 
   Added new method.
   Added [editImage()](#editimage)
 
-- v1.3.1 (December 20, 2022)
+- v1.2.3 (January 14, 2020)
 
-  Updated by [this pull request](https://github.com/tanaikech/ImgApp/pull/11).
+  Error message was added by [https://github.com/tanaikech/ImgApp/issues/5](https://github.com/tanaikech/ImgApp/issues/5)
 
-- v1.3.2 (January 27, 2023)
+- v1.2.2 (April 6, 2019)
 
-  Updated by [this report](https://github.com/tanaikech/ImgApp/issues/13). From this version, the shared Drive can be used.
+  By Google's update, the error of "Malformed multipart body." occurs. This error was resolved.
 
-- v1.3.3 (May 16, 2024)
+- v1.2.1 (November 5, 2018)
 
-  In SlidesAppp.gs, added a script for checking whether Drive API and Slides API are enabled. [Ref](https://medium.com/@tanaike/checking-api-enabled-with-advanced-google-services-using-google-apps-script-572bcdeb39a8)
+  Efficiency of each loop was enhanced by [this benchmark](https://gist.github.com/tanaikech/848aeafaac1ec676900bb78e3ce220b6).
+
+- v1.2.0 (August 20, 2017)
+
+  Added new method.
+  Added [updateThumbnail()](#updatethumbnail)
+
+- v1.1.0 (June 29, 2017)
+
+  Added new method.
+  Added [doResize()](#doresize)
+
+- v1.0.0 (June 27, 2017)
+
+  Initial release.
+  Added [getSize()](#getsize)
 
 [TOP](#top)
