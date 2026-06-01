@@ -6,7 +6,7 @@
 
 This is a library of image tools for Google Apps Script.
 
-**[UPDATE v2.0.0]** The entire internal architecture has been modernized to ES6+ standards natively leveraging the GAS V8 runtime and Google Drive API v3. High-speed binary parsing logic using `DataView` has drastically reduced execution times and memory constraints. Backward compatibility of all existing methods remains 100% intact.
+**[UPDATE v2.0.1]** The entire internal architecture has been modernized to ES6+ standards natively leveraging the GAS V8 runtime and Google Drive API v3. High-speed binary parsing logic using `DataView` has drastically reduced execution times and memory constraints. Backward compatibility of all existing methods remains 100% intact. Now includes native TIFF dimension/DPI parsing, JPEG EXIF/JFIF DPI parsing, `doResize()` direct Blob input support, and optional target mimeType format conversions.
 
 ## Methods
 
@@ -420,6 +420,14 @@ This is a sample script for reducing the image data size using Google Apps Scrip
 [Tanaike](https://tanaikech.github.io/about/)
 
 # Update History
+
+- **v2.0.1 (June 1, 2026)**
+
+  Added native **TIFF** binary parsing support in `getSize()` for both Little-Endian (`II`) and Big-Endian (`MM`) structures.
+  Added physical resolution extraction (**DPI/PPI**) in `getSize()` from PNG physical chunks (`pHYs`) and JPEG segments (`APP0` JFIF and `APP1` EXIF fallback).
+  Enhanced `doResize()` to support passing a **Blob** directly as the first parameter (automatically managing temporary Drive uploads and trashing under `try ... finally`).
+  Added an optional `mimeType` target parameter to `doResize()` for format conversions.
+  Updated README instructions for Library ID deployments.
 
 - **v2.0.0 (June 1, 2026)**
 

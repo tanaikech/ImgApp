@@ -1,5 +1,5 @@
 /**
- * Title: ImgApp (v2.0.0)
+ * Title: ImgApp (v2.0.1)
  * Author: Tanaike (Refactored to ES6+ V8 Runtime Architecture)
  * GitHub: https://github.com/tanaikech/ImgApp
  */
